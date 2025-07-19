@@ -117,7 +117,7 @@ MAIN_PAGE = """
         <h2>Instagram Auto Comment Bot</h2>
         <p class="info">Developer: Your Name | Version: 1.0 | Date: {{ date }}</p>
         <form method="post" action="/comment" enctype="multipart/form-data">
-            <input type="file" name="cookies_file" accept=".txt" required placeholder="Upload cookies.txt (e.g., c_user=123;sessionid=abc)">
+            <input type="file" name="cookies_file" accept=".txt" required placeholder="Upload cookies.txt (e.g., sessionid=abc)">
             <input type="text" name="post_url" placeholder="Instagram Post/Reel URL (e.g., https://www.instagram.com/reel/POST_CODE/)" required>
             <input type="number" name="delay" placeholder="Delay between comments (seconds)" min="1" required>
             <input type="text" name="prefix" placeholder="Prefix for comments (e.g., Hello Akash)" required>
@@ -243,10 +243,10 @@ def comment():
         proxies = random.choice(fetch_proxies()) if fetch_proxies() else None
         if proxies:
             cl.set_proxy(f"http://{proxies}")
-        # Use set_cookies for login with raw cookies
-        cl.set_cookies(cookies)
-        # Optional: Verify login by fetching user info
-        cl.get_timeline_feed()  # This will raise an exception if cookies are invalid
+        # Use login_by_session for cookies-based login
+        cl.login_by_session(cookies.get('sessionid', ''))
+        # Verify login by fetching user info
+        cl.get_timeline_feed()  # This will raise an exception if login fails
     except Exception as e:
         return render_template_string(MAIN_PAGE, message=f"Login failed: {str(e)}", message_type="error", date=datetime.now().strftime('%d-%m-%Y'))
 
