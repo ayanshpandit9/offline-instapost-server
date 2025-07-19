@@ -1,4 +1,4 @@
-from flask import Flask, request, render_template_string, redirect, url_for, session
+from flask import Flask, request, render_template_string
 from instagrapi import Client
 import random
 import requests
@@ -118,7 +118,7 @@ MAIN_PAGE = """
         <p class="info">Developer: Your Name | Version: 1.0 | Date: {{ date }}</p>
         <form method="post" action="/comment" enctype="multipart/form-data">
             <input type="file" name="cookies_file" accept=".txt" required placeholder="Upload cookies.txt (e.g., c_user=123;sessionid=abc)">
-            <input type="text" name="post_url" placeholder="Instagram Post URL (e.g., https://www.instagram.com/p/POST_CODE/)" required>
+            <input type="text" name="post_url" placeholder="Instagram Post/Reel URL (e.g., https://www.instagram.com/reel/POST_CODE/)" required>
             <input type="number" name="delay" placeholder="Delay between comments (seconds)" min="1" required>
             <input type="text" name="prefix" placeholder="Prefix for comments (e.g., Hello Akash)" required>
             <input type="file" name="comment_file" accept=".txt" required placeholder="Upload comments.txt">
@@ -170,10 +170,14 @@ def generate_user_agent():
     ]
     return random.choice(devices)
 
-# Convert Instagram post URL to media ID
+# Convert Instagram post/reel URL to media ID
 def get_media_id(post_url, client):
     try:
-        shortcode = post_url.split('/p/')[1].split('/')[0]
+        # Handle both /p/ and /reel/ URLs
+        if '/reel/' in post_url:
+            shortcode = post_url.split('/reel/')[1].split('/')[0].split('?')[0]
+        else:
+            shortcode = post_url.split('/p/')[1].split('/')[0].split('?')[0]
         media_id = client.media_id(client.media_pk_from_url(post_url))
         return media_id
     except Exception as e:
@@ -239,15 +243,17 @@ def comment():
         proxies = random.choice(fetch_proxies()) if fetch_proxies() else None
         if proxies:
             cl.set_proxy(f"http://{proxies}")
-        cl.load_settings_dict({"cookies": cookies})
-        cl.login_by_sessionid(cookies.get('sessionid', ''))
+        # Use set_cookies for login with raw cookies
+        cl.set_cookies(cookies)
+        # Optional: Verify login by fetching user info
+        cl.get_timeline_feed()  # This will raise an exception if cookies are invalid
     except Exception as e:
         return render_template_string(MAIN_PAGE, message=f"Login failed: {str(e)}", message_type="error", date=datetime.now().strftime('%d-%m-%Y'))
 
     # Get media ID from URL
     media_id = get_media_id(post_url, cl)
     if not media_id:
-        return render_template_string(MAIN_PAGE, message="Invalid post URL or unable to fetch media ID", message_type="error", date=datetime.now().strftime('%d-%m-%Y'))
+        return render_template_string(MAIN_PAGE, message="Invalid post/reel URL or unable to fetch media ID", message_type="error", date=datetime.now().strftime('%d-%m-%Y'))
 
     # Post comments with delay
     with ThreadPool(max_workers=5) as pool:
