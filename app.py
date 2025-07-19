@@ -4,7 +4,6 @@ import random
 import requests
 import time
 import os
-import json
 from concurrent.futures import ThreadPoolExecutor as ThreadPool
 from datetime import datetime
 
@@ -20,32 +19,109 @@ x = f'{G}➤{W}➤'
 xy1 = f'{G}•{W}•'
 xy = f'{G}━{W}➤'
 
-# HTML templates
+# Modern HTML template for single form
 MAIN_PAGE = """
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Instagram Auto Comment Bot</title>
     <style>
-        body { font-family: Arial, sans-serif; background-color: #f0f0f0; text-align: center; padding: 50px; }
-        .container { max-width: 400px; margin: auto; background: white; padding: 20px; border-radius: 10px; }
-        input, button { margin: 10px; padding: 10px; width: 80%; }
-        button { background-color: #4CAF50; color: white; border: none; cursor: pointer; }
-        button:hover { background-color: #45a049; }
-        .success { color: green; }
-        .error { color: red; }
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Segoe UI', Arial, sans-serif;
+        }
+        body {
+            background: linear-gradient(135deg, #833ab4, #fd1d1d, #fcb045);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container {
+            background: white;
+            max-width: 500px;
+            width: 100%;
+            padding: 30px;
+            border-radius: 15px;
+            box-shadow: 0 8px 16px rgba(0, 0, 0, 0.2);
+        }
+        h2 {
+            color: #333;
+            text-align: center;
+            margin-bottom: 10px;
+        }
+        .info {
+            color: #555;
+            text-align: center;
+            margin-bottom: 20px;
+            font-size: 0.9em;
+        }
+        form {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+        input[type="file"], input[type="text"], input[type="number"] {
+            padding: 12px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            font-size: 1em;
+            transition: border-color 0.3s;
+        }
+        input[type="file"]:focus, input[type="text"]:focus, input[type="number"]:focus {
+            border-color: #4CAF50;
+            outline: none;
+        }
+        button {
+            padding: 12px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 1.1em;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+        .success {
+            color: #4CAF50;
+            text-align: center;
+            margin-top: 15px;
+            font-weight: bold;
+        }
+        .error {
+            color: #e74c3c;
+            text-align: center;
+            margin-top: 15px;
+            font-weight: bold;
+        }
+        @media (max-width: 600px) {
+            .container {
+                padding: 20px;
+            }
+            input, button {
+                font-size: 0.9em;
+            }
+        }
     </style>
 </head>
 <body>
     <div class="container">
         <h2>Instagram Auto Comment Bot</h2>
-        <p>Developer: Your Name | Version: 1.0 | Date: {{ date }}</p>
+        <p class="info">Developer: Your Name | Version: 1.0 | Date: {{ date }}</p>
         <form method="post" action="/comment" enctype="multipart/form-data">
-            <input type="file" name="cookies_file" accept=".json" required placeholder="Upload cookies.json"><br>
-            <input type="text" name="post_url" placeholder="Instagram Post URL (e.g., https://www.instagram.com/p/POST_CODE/)" required><br>
-            <input type="number" name="delay" placeholder="Delay between comments (seconds)" min="1" required><br>
-            <input type="text" name="prefix" placeholder="Prefix for comments (e.g., Hello Akash)" required><br>
-            <input type="file" name="comment_file" accept=".txt" required placeholder="Upload comments.txt"><br>
+            <input type="file" name="cookies_file" accept=".txt" required placeholder="Upload cookies.txt (e.g., c_user=123;sessionid=abc)">
+            <input type="text" name="post_url" placeholder="Instagram Post URL (e.g., https://www.instagram.com/p/POST_CODE/)" required>
+            <input type="number" name="delay" placeholder="Delay between comments (seconds)" min="1" required>
+            <input type="text" name="prefix" placeholder="Prefix for comments (e.g., Hello Akash)" required>
+            <input type="file" name="comment_file" accept=".txt" required placeholder="Upload comments.txt">
             <button type="submit">Start Commenting</button>
         </form>
         {% if message %}
@@ -55,6 +131,20 @@ MAIN_PAGE = """
 </body>
 </html>
 """
+
+# Parse raw cookies from text file
+def parse_cookies(cookies_text):
+    cookies = {}
+    try:
+        # Split cookies by semicolon
+        for cookie in cookies_text.split(';'):
+            if '=' in cookie:
+                name, value = cookie.strip().split('=', 1)
+                cookies[name] = value
+        return cookies
+    except Exception as e:
+        print(f"{Y}Error parsing cookies: {e}")
+        return None
 
 # Fetch proxies
 def fetch_proxies():
@@ -120,14 +210,17 @@ def comment():
     prefix = request.form.get('prefix')
     comment_file = request.files.get('comment_file')
 
-    # Save and read cookies file
+    # Save and parse cookies file
     if cookies_file:
-        cookies_file.save('cookies.json')
+        cookies_file.save('cookies.txt')
         try:
-            with open('cookies.json', 'r') as f:
-                cookies = json.load(f)
+            with open('cookies.txt', 'r') as f:
+                cookies_text = f.read().strip()
+            cookies = parse_cookies(cookies_text)
+            if not cookies or 'sessionid' not in cookies:
+                return render_template_string(MAIN_PAGE, message="Invalid cookies file or missing sessionid", message_type="error", date=datetime.now().strftime('%d-%m-%Y'))
         except Exception as e:
-            return render_template_string(MAIN_PAGE, message=f"Invalid cookies file: {str(e)}", message_type="error", date=datetime.now().strftime('%d-%m-%Y'))
+            return render_template_string(MAIN_PAGE, message=f"Error reading cookies file: {str(e)}", message_type="error", date=datetime.now().strftime('%d-%m-%Y'))
     else:
         return render_template_string(MAIN_PAGE, message="No cookies file uploaded", message_type="error", date=datetime.now().strftime('%d-%m-%Y'))
 
