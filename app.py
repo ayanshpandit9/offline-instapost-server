@@ -243,8 +243,8 @@ def comment():
         proxies = random.choice(fetch_proxies()) if fetch_proxies() else None
         if proxies:
             cl.set_proxy(f"http://{proxies}")
-        # Use login_by_session for cookies-based login
-        cl.login_by_session(cookies.get('sessionid', ''))
+        # Set cookies directly in the request session
+        cl.request.cookies.update(cookies)
         # Verify login by fetching user info
         cl.get_timeline_feed()  # This will raise an exception if login fails
     except Exception as e:
